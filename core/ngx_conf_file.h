@@ -100,6 +100,22 @@ struct ngx_open_file_s {
 #define NGX_MODULE_V1_PADDING  0, 0, 0, 0, 0, 0, 0, 0
 
 struct ngx_module_s {
+
+
+	/*index: NGX_CORE_MODULE模块会使用index作为conf_ctx指针数组的索引:
+		ngx_init_cycle: cycle->conf_ctx[ngx_modules[i]->index] = rv; 
+		rv是每个core模块设置的存储配置的结构体(如ngx_http_conf_ctx_t)指针
+		
+		如果想获取存储在指针数组conf_ctx中的对应的rv: 
+		ngx_conf_handler: conf = ((void **) cf->ctx)[ngx_modules[i]->index]; 
+		((void **) cf->ctx)将ctx指针强制转换成二重指针，实质就是指针数组(数组元素也是指针)，
+		((void **) cf->ctx)[ngx_modules[i]->index]确定索引，实质就是一重指针了，所以conf就是ngx_http_conf_ctx_t指针
+		
+
+	ctx_index: 某一类模块如NGX_HTTP_MODULE，会使用ctx_index作为二级(同类)模块的索引:
+			   ngx_http_block: ngx_modules[m]->ctx_index = ngx_http_max_module++;
+	*/
+	
     ngx_uint_t            ctx_index;
     ngx_uint_t            index;
 
@@ -163,8 +179,8 @@ struct ngx_conf_s {
     ngx_pool_t           *temp_pool;
     ngx_conf_file_t      *conf_file;
     ngx_log_t            *log;
-
-    void                 *ctx;
+	
+    void                 *ctx;	
     ngx_uint_t            module_type;
     ngx_uint_t            cmd_type;
 

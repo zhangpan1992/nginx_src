@@ -150,9 +150,32 @@ typedef struct {
 } ngx_http_phase_t;
 
 
+
+/*
+遇到 server指令:
+生成一个新的ngx_http_conf_ctx_t，其中main_conf指向原来的，server_conf和loc_conf创建新的void*数组(注意是数组)
+把ngx_http_core_module的server块配置信息存入 main_conf 中的server 容器里面。更新当前环境,开始解析server块里面的指令
+cf->ctx = ctx;        //指向新的ngx_http_conf_ctx_t
+cf->cmd_type = NGX_HTTP_SRV_CONF;
+
+遇到server里面的指令：
+如 listen 指令时，ngx_conf_handler中，confp指向的新的ngx_http_conf_ctx_t.srv_conf所指向的void*数组
+于是 conf = confp[ngx_modules[i]->ctx_index](二级模块)就指向listen指令对应的模块的 ngx_http_core_srv_conf_t数据结构
+
+遇到location指令：
+生成一个新的ngx_http_conf_ctx_t，其中main_conf指向原来的，srv_conf指向上一层ngx_http_conf_ctx_t的srv_conf数组，loc_conf创建新的void*数组
+ngx_http_core_location 这个函数很麻烦，看起来主要是设置ngx_http_loc_conf_ctx_t里面的name变量。然后递归调用ngx_parse_conf解析location里面的命令
+遇到location里面的命令。比如 root，设置ngx_http_loc_conf_ctx_t里面的root变量
+
+以上可以用http://tech.uc.cn/?p=300的第二张图完美解释
+*/
+
+
+//该配置项结构体放在ngx_http_conf_ctx_t的main_conf指针数组中
 typedef struct {
     ngx_array_t                servers;         /* ngx_http_core_srv_conf_t */
 
+	//注意这个结构体
     ngx_http_phase_engine_t    phase_engine;
 
     ngx_hash_t                 headers_in_hash;
@@ -178,6 +201,8 @@ typedef struct {
 } ngx_http_core_main_conf_t;
 
 
+
+//该配置项结构体放在ngx_http_conf_ctx_t的srv_conf指针数组中,存储着server层的配置参数
 typedef struct {
     /* array of the ngx_http_server_name_t, "server_name" directive */
     ngx_array_t                 server_names;

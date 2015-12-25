@@ -370,16 +370,31 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
 
             conf = NULL;
 
+			//全局配置，如worker_processes等
             if (cmd->type & NGX_DIRECT_CONF) {
                 conf = ((void **) cf->ctx)[ngx_modules[i]->index];
-
+		
             } else if (cmd->type & NGX_MAIN_CONF) {
                 conf = &(((void **) cf->ctx)[ngx_modules[i]->index]);
 
+
+			//对于http 块内的解析会进入该分支
+
+			/*如，ngx_http_core_server: 
+			  cf->ctx = ctx;        //指向新的ngx_http_conf_ctx_t
+			  cf->cmd_type = NGX_HTTP_SRV_CONF;
+
+			  ngx_http_core_server-->ngx_conf_phase-->ngx_conf_handler
+			*/
             } else if (cf->ctx) {
+
+				//cmd->conf代表了该指令对应的数据结构到底是该出现在main_conf还是srv_conf抑或是loc_conf数组?
                 confp = *(void **) ((char *) cf->ctx + cmd->conf);
 
+				//confp的结果是二重指针，指向http://m.blog.csdn.net/blog/kai_ding/40259751最后一张图的main_conf/srv_conf/loc_conf数组
                 if (confp) {
+					//confp本身指向3个数组中的一个，索引确定，则就能确定是哪个配置项结构体了
+					//实际上，conf本身也是指针，指向一个配置项结构体
                     conf = confp[ngx_modules[i]->ctx_index];
                 }
             }

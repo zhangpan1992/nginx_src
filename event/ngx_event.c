@@ -160,7 +160,7 @@ static ngx_command_t  ngx_event_core_commands[] = {
       NGX_EVENT_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_msec_slot,
       0,
-      offsetof(ngx_event_conf_t, accept_mutex_delay),
+      offsetof(ngx_event_conf_t, accept_mutex_delay),  //offsetof函数用于获取存储配置的结构体中的某个成员的偏移量
       NULL },
 
     { ngx_string("debug_connection"),
@@ -170,7 +170,7 @@ static ngx_command_t  ngx_event_core_commands[] = {
       0,
       NULL },
 
-      ngx_null_command
+      ngx_null_command   //数组最后一个元素一定是这个
 };
 
 
