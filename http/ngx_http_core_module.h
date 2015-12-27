@@ -106,12 +106,16 @@ typedef struct {
 } ngx_http_listen_opt_t;
 
 
+//http处理的11个阶段，每个阶段皆可由任意多个模块共同来完成
 typedef enum {
     NGX_HTTP_POST_READ_PHASE = 0,
 
+	//匹配location前修改uri，即所谓的重定向
     NGX_HTTP_SERVER_REWRITE_PHASE,
 
     NGX_HTTP_FIND_CONFIG_PHASE,
+
+	//匹配location后修改uri
     NGX_HTTP_REWRITE_PHASE,
     NGX_HTTP_POST_REWRITE_PHASE,
 
@@ -172,6 +176,7 @@ ngx_http_core_location 这个函数很麻烦，看起来主要是设置ngx_http_loc_conf_ctx_t里
 
 
 //该配置项结构体放在ngx_http_conf_ctx_t的main_conf指针数组中
+
 typedef struct {
     ngx_array_t                servers;         /* ngx_http_core_srv_conf_t */
 
@@ -193,6 +198,9 @@ typedef struct {
 
     ngx_hash_keys_arrays_t    *variables_keys;
 
+	//存储该http{}配置块下监听的所有ngx_http_conf_port_t
+	//ngx_http_core_main_conf_t.ports -->ngx_http_conf_port_t.addrs 
+	//     --> 具体ngx_http_conf_addr_t.servers -->某一个server块虚拟主机ngx_http_core_srv_conf_t
     ngx_array_t               *ports;
 
     ngx_uint_t                 try_files;       /* unsigned  try_files:1 */
@@ -291,16 +299,24 @@ typedef struct {
 } ngx_http_port_t;
 
 
+//每监听一个TCP端口，都使用一个该结构来表示
 typedef struct {
     ngx_int_t                  family;
     in_port_t                  port;
+
+	//每一个监听端口都可以被多个server name监听
     ngx_array_t                addrs;     /* array of ngx_http_conf_addr_t */
 } ngx_http_conf_port_t;
 
 
+/*一个ngx_http_conf_port_t对应多个ngx_http_conf_addr_t
+* ngx_http_conf_addr_t就是以动态数组的形式保存在ngx_http_conf_port_t addrs成员中的
+* 每一个监听地址 ngx_http_conf_addr_t 都对应着一个ngx_listening_t
+*/
 typedef struct {
     ngx_http_listen_opt_t      opt;
 
+	//key(server_name)-->value(ngx_http_core_srv_conf_t),快速检索server{}配置块
     ngx_hash_t                 hash;
     ngx_hash_wildcard_t       *wc_head;
     ngx_hash_wildcard_t       *wc_tail;

@@ -2974,6 +2974,7 @@ ngx_http_get_forwarded_addr_internal(ngx_http_request_t *r, ngx_addr_t *addr,
 }
 
 
+//解析server级别的配置项，遇到server {} 则调用，参见图10-3
 static char *
 ngx_http_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 {
@@ -3010,6 +3011,7 @@ ngx_http_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
         return NGX_CONF_ERROR;
     }
 
+	//循环调用所有模块的create_srv_conf和create_loc_conf方法
     for (i = 0; ngx_modules[i]; i++) {
         if (ngx_modules[i]->type != NGX_HTTP_MODULE) {
             continue;
@@ -3039,7 +3041,18 @@ ngx_http_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 
     /* the server configuration context */
 
+	/* 第一个http模块是ngx_http_core_module，它调用create_srv_conf生成配置结构体
+	   ngx_http_core_srv_conf_t
+
+	   调用create_main_conf生成配置结构体ngx_http_core_main_conf_t,
+	   该结构体有一个成员 servers数组，
+	   该数组存储着上面所述的指向ngx_http_core_srv_conf_t地址的指针
+
+	   具体参考图10-3
+	*/
     cscf = ctx->srv_conf[ngx_http_core_module.ctx_index];
+
+	//ngx_http_core_srv_conf_t结构体的ctx成员指向新生成的ngx_http_conf_ctx_t
     cscf->ctx = ctx;
 
 
@@ -3053,7 +3066,7 @@ ngx_http_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
     *cscfp = cscf;
 
 
-    /* parse inside server{} */
+    /* parse inside server{} 开始解析server内的配置项*/
 
     pcf = *cf;
     cf->ctx = ctx;
@@ -3098,6 +3111,8 @@ ngx_http_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 }
 
 
+
+//解析loc级别的配置项，遇到location {} 则调用，参见图10-5
 static char *
 ngx_http_core_location(ngx_conf_t *cf, ngx_command_t *cmd, void *dummy)
 {

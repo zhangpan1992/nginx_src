@@ -2212,6 +2212,7 @@ ngx_http_post_request(ngx_http_request_t *r, ngx_http_posted_request_t *pr)
 }
 
 
+//HTTP框架提供给HTTP模块的最常使用的结束请求的方法
 void
 ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
 {
@@ -2241,6 +2242,7 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
         return;
     }
 
+	//处理子请求
     if (r != r->main && r->post_subrequest) {
         rc = r->post_subrequest->handler(r, r->post_subrequest->data, rc);
     }
@@ -2262,6 +2264,7 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
         return;
     }
 
+	//表示请求的动作是上传文件/发送响应码大于300的特殊响应(异步)
     if (rc >= NGX_HTTP_SPECIAL_RESPONSE
         || rc == NGX_HTTP_CREATED
         || rc == NGX_HTTP_NO_CONTENT)
@@ -2356,6 +2359,7 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
         return;
     }
 
+	//客户端原始请求
     if (r->buffered || c->buffered || r->postponed || r->blocked) {
 
         if (ngx_http_set_write_handler(r) != NGX_OK) {
@@ -2475,13 +2479,16 @@ ngx_http_finalize_connection(ngx_http_request_t *r)
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
+	//如果不等于1，说明还有多个动作在操作同一请求
     if (r->main->count != 1) {
 
+		//正在丢弃包体
         if (r->discard_body) {
             r->read_event_handler = ngx_http_discarded_request_body_handler;
             ngx_add_timer(r->connection->read, clcf->lingering_timeout);
 
             if (r->lingering_time == 0) {
+				//未来的linger time
                 r->lingering_time = ngx_time()
                                       + (time_t) (clcf->lingering_time / 1000);
             }
@@ -2491,6 +2498,8 @@ ngx_http_finalize_connection(ngx_http_request_t *r)
         return;
     }
 
+	//keepalive为1,则请求可释放，但TCP连接还要复用
+	//则调用ngx_http_set_keepalive方法释放ngx_http_request_t结构体，但不会关闭连接
     if (!ngx_terminate
          && !ngx_exiting
          && r->keepalive
@@ -2505,7 +2514,8 @@ ngx_http_finalize_connection(ngx_http_request_t *r)
             && (r->lingering_close
                 || r->header_in->pos < r->header_in->last
                 || r->connection->read->ready)))
-    {
+    {	
+    	//延迟关闭请求--接收完字符流再关闭连接
         ngx_http_set_lingering_close(r);
         return;
     }

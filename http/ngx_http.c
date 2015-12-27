@@ -246,7 +246,8 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
      * init http{} main_conf's, merge the server{}s' srv_conf's
      * and its location{}s' loc_conf's
      */
-
+     
+	//cmcf是ngx_http_core_main_conf_t结构体
     cmcf = ctx->main_conf[ngx_http_core_module.ctx_index];
     cscfp = cmcf->servers.elts;
 
@@ -255,6 +256,7 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             continue;
         }
 
+		//ctx是ngx_http_module_t结构体
         module = ngx_modules[m]->ctx;
         mi = ngx_modules[m]->ctx_index;
 
@@ -267,6 +269,7 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             }
         }
 
+		//ngx_http_core_main_conf_t结构体的servers成员
         rv = ngx_http_merge_servers(cf, cmcf, module, mi);
         if (rv != NGX_CONF_OK) {
             goto failed;
@@ -275,15 +278,19 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
     /* create location trees */
+	//构建location二叉查找树，提高查找效率
 
     for (s = 0; s < cmcf->servers.nelts; s++) {
 
         clcf = cscfp[s]->ctx->loc_conf[ngx_http_core_module.ctx_index];
 
+		//location双向链表根据location字符串进行排序
         if (ngx_http_init_locations(cf, cscfp[s], clcf) != NGX_OK) {
             return NGX_CONF_ERROR;
         }
 
+		//根据已经排过序的双向链表，快速构建静态二叉查找树
+		//ngx_http_core_module定义了ngx_http_core_find_location方法用于检索ngx_http_core_loc_conf_t结构体
         if (ngx_http_init_static_location_trees(cf, clcf) != NGX_OK) {
             return NGX_CONF_ERROR;
         }
@@ -569,20 +576,25 @@ ngx_http_merge_servers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf,
     ngx_http_core_loc_conf_t    *clcf;
     ngx_http_core_srv_conf_t   **cscfp;
 
+	//ngx_http_core_main_conf_t结构体的成员servers数组
     cscfp = cmcf->servers.elts;
     ctx = (ngx_http_conf_ctx_t *) cf->ctx;
     saved = *ctx;
     rv = NGX_CONF_OK;
 
+	//将saved.srv_conf[ctx_index]合并到各server块内
     for (s = 0; s < cmcf->servers.nelts; s++) {
 
         /* merge the server{}s' srv_conf's */
 
-        ctx->srv_conf = cscfp[s]->ctx->srv_conf;
+		//server {} 级别的,所有的配置结构体
+        ctx->srv_conf = cscfp[s]->ctx->srv_conf;  
 
         if (module->merge_srv_conf) {
+			//saved.srv_conf[ctx_index]是main(http {})级别的
             rv = module->merge_srv_conf(cf, saved.srv_conf[ctx_index],
                                         cscfp[s]->ctx->srv_conf[ctx_index]);
+			
             if (rv != NGX_CONF_OK) {
                 goto failed;
             }
@@ -592,8 +604,10 @@ ngx_http_merge_servers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf,
 
             /* merge the server{}'s loc_conf */
 
+			//server {} 级别的
             ctx->loc_conf = cscfp[s]->ctx->loc_conf;
 
+			//saved.loc_conf[ctx_index]是main(http {})级别的
             rv = module->merge_loc_conf(cf, saved.loc_conf[ctx_index],
                                         cscfp[s]->ctx->loc_conf[ctx_index]);
             if (rv != NGX_CONF_OK) {
@@ -602,8 +616,18 @@ ngx_http_merge_servers(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf,
 
             /* merge the locations{}' loc_conf's */
 
+			//这个不是所有的，而是针对core模块)，server {} 级别创建的loc结构体(见图10-7)
             clcf = cscfp[s]->ctx->loc_conf[ngx_http_core_module.ctx_index];
 
+
+			/*
+			* 每个server块ngx_http_core_loc_conf_t(server级别创建)中的locations双向链表会包含所属的全部location块
+			* clcf->locations指向的即是双向链表形式串联起来的该server{}下所有的loc配置结构体
+			* 实际上是loc级别的配置项，而cscfp[s]->ctx->loc_conf才是server{}级别的
+	
+			* 调用ngx_http_merge_locations方法
+			* 实际被合并的是cscfp[s]->ctx->loc_conf[ctx_index]，因为合并也是有针对性的嘛
+			*/
             rv = ngx_http_merge_locations(cf, clcf->locations,
                                           cscfp[s]->ctx->loc_conf,
                                           module, ctx_index);
@@ -638,21 +662,27 @@ ngx_http_merge_locations(ngx_conf_t *cf, ngx_queue_t *locations,
     ctx = (ngx_http_conf_ctx_t *) cf->ctx;
     saved = *ctx;
 
+	//把loc_conf[ctx_index]合并到每一个loc配置结构体clcf->loc_conf[ctx_index]中
     for (q = ngx_queue_head(locations);
          q != ngx_queue_sentinel(locations);
          q = ngx_queue_next(q))
     {
         lq = (ngx_http_location_queue_t *) q;
 
+		//clcf即是该location对应的ngx_http_core_loc_conf_t配置结构体
         clcf = lq->exact ? lq->exact : lq->inclusive;
+
+		//clcf->loc_conf是loc级别建立的配置结构体数组
         ctx->loc_conf = clcf->loc_conf;
 
+		//是把loc_conf[ctx_index]合并到每一个loc配置结构体clcf->loc_conf[ctx_index]中
         rv = module->merge_loc_conf(cf, loc_conf[ctx_index],
                                     clcf->loc_conf[ctx_index]);
         if (rv != NGX_CONF_OK) {
             return rv;
         }
 
+		//对于嵌套的location，将clcf->loc_conf[ctx_index]合并到每一个clcf->locations中
         rv = ngx_http_merge_locations(cf, clcf->locations, clcf->loc_conf,
                                       module, ctx_index);
         if (rv != NGX_CONF_OK) {
